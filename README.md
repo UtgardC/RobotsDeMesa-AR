@@ -13,7 +13,13 @@ Prototipo de realidad aumentada para Android. Colocá a Milo sobre una mesa real
 
 Mostrá cada imagen en otra pantalla o imprimila. Ponela sobre la mesa y apuntá con la cámara. Cuando la app la reconozca, el robot aparece sobre la tarjeta y se desbloquea en la colección. Tocá su pestaña y después una zona del plano para colocarlo. Los desbloqueos quedan guardados en el dispositivo.
 
-- [Tarjeta de Nova](Assets/RobotsDeMesa/Cards/Nova.png)
-- [Tarjeta de Byte](Assets/RobotsDeMesa/Cards/Byte.png)
+<p align="center">
+  <img src="Assets/RobotsDeMesa/Cards/Nova.png" alt="Tarjeta de Nova" width="320"><br>
+  <em>Tarjeta de Nova</em>
+</p>
 
+<p align="center">
+  <img src="Assets/RobotsDeMesa/Cards/Byte.png" alt="Tarjeta de Byte" width="320"><br>
+  <em>Tarjeta de Byte</em>
+</p>
 
