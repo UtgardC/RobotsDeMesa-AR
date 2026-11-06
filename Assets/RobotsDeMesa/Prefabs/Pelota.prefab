@@ -132,8 +132,8 @@ GameObject:
   - component: {fileID: 5048932096963779521}
   - component: {fileID: 247147222111380547}
   - component: {fileID: 15669808718147151}
-  - component: {fileID: 6130093058562334645}
   - component: {fileID: 5108216859729638190}
+  - component: {fileID: 5173854840228482774}
   m_Layer: 0
   m_Name: Pelota
   m_TagString: Untagged
@@ -166,9 +166,9 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4263720392613575643}
   serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_Mass: 0.08
+  m_LinearDamping: 0.08
+  m_AngularDamping: 0.25
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -180,11 +180,11 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 1
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 2
 --- !u!114 &15669808718147151
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -267,27 +267,27 @@ MonoBehaviour:
   m_MatchAttachRotation: 0
   m_SnapToColliderVolume: 0
   m_ReinitializeDynamicAttachEverySingleGrab: 0
-  m_AttachEaseInTime: 0.15
-  m_MovementType: 2
-  m_PredictedVisualsTransform: {fileID: 5172934784764535866}
-  m_VelocityDamping: 1
-  m_VelocityScale: 1
+  m_AttachEaseInTime: 0.1
+  m_MovementType: 0
+  m_PredictedVisualsTransform: {fileID: 0}
+  m_VelocityDamping: 0.65
+  m_VelocityScale: 0.25
   m_AngularVelocityDamping: 1
   m_AngularVelocityScale: 1
   m_TrackPosition: 1
   m_SmoothPosition: 0
   m_SmoothPositionAmount: 5
   m_TightenPosition: 0.5
-  m_TrackRotation: 1
+  m_TrackRotation: 0
   m_SmoothRotation: 0
   m_SmoothRotationAmount: 5
   m_TightenRotation: 0.5
-  m_TrackScale: 1
+  m_TrackScale: 0
   m_SmoothScale: 0
   m_SmoothScaleAmount: 8
   m_TightenScale: 0.1
-  m_ThrowOnDetach: 0
-  m_ThrowSmoothingDuration: 0.25
+  m_ThrowOnDetach: 1
+  m_ThrowSmoothingDuration: 0.1
   m_ThrowSmoothingCurve:
     serializedVersion: 2
     m_Curve:
@@ -303,41 +303,19 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  m_ThrowVelocityScale: 1.5
-  m_ThrowAngularVelocityScale: 1
+  m_ThrowVelocityScale: 0.9
+  m_ThrowAngularVelocityScale: 0
   m_ForceGravityOnDetach: 0
   m_RetainTransformParent: 1
-  m_StartingSingleGrabTransformers: []
+  m_StartingSingleGrabTransformers:
+  - {fileID: 5173854840228482774}
   m_StartingMultipleGrabTransformers: []
-  m_AddDefaultGrabTransformers: 1
+  m_AddDefaultGrabTransformers: 0
   m_FarAttachMode: 0
-  m_LimitLinearVelocity: 0
+  m_LimitLinearVelocity: 1
   m_LimitAngularVelocity: 0
-  m_MaxLinearVelocityDelta: 10
+  m_MaxLinearVelocityDelta: 0.8
   m_MaxAngularVelocityDelta: 20
---- !u!114 &6130093058562334645
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4263720392613575643}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b309761041ee54265b7f9a8c0f373dab, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_ObjectPlaneTranslationMode: 2
-  m_EnablePlaneClassificationFilter: 0
-  m_PlaneClassificationsList: 
-  m_PlaneClassifications: 0
-  m_UseInteractorOrientation: 0
-  m_MinScale: 0.3
-  m_MaxScale: 2
-  m_ScaleSensitivity: 0.75
-  m_Elasticity: 0.15
-  m_EnableElasticBreakLimit: 1
-  m_ElasticBreakLimit: 0.5
 --- !u!135 &5108216859729638190
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -345,7 +323,7 @@ SphereCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4263720392613575643}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: b1247c1675cf2a749b9b39af974852f9, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -359,6 +337,18 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.055
   m_Center: {x: 0, y: 0.055, z: 0}
+--- !u!114 &5173854840228482774
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4263720392613575643}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6eedf4436efdb84fbcd5ab8803dfee4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RobotsDeMesa.PhysicsTablePiece
 --- !u!1 &4479606976945853515
 GameObject:
   m_ObjectHideFlags: 0

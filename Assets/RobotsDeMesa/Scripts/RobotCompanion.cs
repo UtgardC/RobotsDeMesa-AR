@@ -20,6 +20,7 @@ namespace RobotsDeMesa
         private XRGrabInteractable grab;
         private Coroutine activeWave;
         private Coroutine bodyAction;
+        private Coroutine wander;
         private BodyPart[] body;
         private BodyPart leftLeg;
         private BodyPart leftFoot;
@@ -31,6 +32,7 @@ namespace RobotsDeMesa
 
         public bool IsSeated { get; private set; }
         public bool IsMoving { get; private set; }
+        public bool IsWandering => wander != null;
         public bool IsManipulated => grab != null && grab.isSelected;
 
         private void Awake()
@@ -70,6 +72,7 @@ namespace RobotsDeMesa
         private void OnDisable()
         {
             grab.selectEntered.RemoveListener(OnGrabbed);
+            StopWandering();
             StopBodyAction();
 
             IsSeated = false;
@@ -93,7 +96,7 @@ namespace RobotsDeMesa
 
         public void ToggleSit()
         {
-            if (!isActiveAndEnabled || body == null || IsMoving || IsManipulated)
+            if (!isActiveAndEnabled || body == null || IsMoving || IsWandering || IsManipulated)
                 return;
 
             StopBodyAction();
@@ -116,8 +119,49 @@ namespace RobotsDeMesa
             return true;
         }
 
+        public bool TryWander(System.Func<Vector3?> chooseDestination)
+        {
+            if (IsWandering || IsMoving || IsManipulated)
+                return false;
+
+            Vector3? firstDestination = chooseDestination();
+            if (!firstDestination.HasValue || !TryMove(firstDestination.Value))
+                return false;
+
+            wander = StartCoroutine(ContinueWandering(chooseDestination));
+            return true;
+        }
+
+        private IEnumerator ContinueWandering(System.Func<Vector3?> chooseDestination)
+        {
+            int remainingSteps = Random.Range(2, 5);
+            while (IsMoving)
+                yield return null;
+
+            for (int i = 0; i < remainingSteps; i++)
+            {
+                yield return new WaitForSeconds(Random.Range(.14f, .45f));
+                Vector3? destination = chooseDestination();
+                if (!destination.HasValue || !TryMove(destination.Value))
+                    break;
+                while (IsMoving)
+                    yield return null;
+            }
+
+            wander = null;
+        }
+
+        private void StopWandering()
+        {
+            if (wander == null)
+                return;
+            StopCoroutine(wander);
+            wander = null;
+        }
+
         private void OnGrabbed(SelectEnterEventArgs args)
         {
+            StopWandering();
             if (bodyAction == null)
                 return;
 
@@ -160,20 +204,24 @@ namespace RobotsDeMesa
                 yield return BlendSeat(0f);
 
             Vector3 origin = transform.position;
-            Vector3 direction = transform.InverseTransformDirection(destination - origin);
-            direction.y = 0f;
-            direction.Normalize();
+            Quaternion initialRotation = transform.rotation;
+            Vector3 forward = Vector3.ProjectOnPlane(destination - origin, transform.up);
+            Quaternion facing = forward.sqrMagnitude > .0001f
+                ? Quaternion.LookRotation(forward, transform.up)
+                : initialRotation;
 
             for (float elapsed = 0f; elapsed < WalkDuration; elapsed += Time.deltaTime)
             {
                 float progress = elapsed / WalkDuration;
-                transform.position = Vector3.LerpUnclamped(origin, destination, Mathf.SmoothStep(0f, 1f, progress));
+                Vector3 position = Vector3.LerpUnclamped(origin, destination, Mathf.SmoothStep(0f, 1f, progress));
+                Quaternion rotation = Quaternion.Slerp(initialRotation, facing, Mathf.SmoothStep(0f, 1f, progress * 3f));
+                transform.SetPositionAndRotation(position, rotation);
                 float stride = Mathf.Sin(progress * 4f * Mathf.PI) * Mathf.Sin(progress * Mathf.PI);
-                SetBodyPose(0f, direction, stride);
+                SetBodyPose(0f, Vector3.forward, stride);
                 yield return null;
             }
 
-            transform.position = destination;
+            transform.SetPositionAndRotation(destination, facing);
             SetBodyPose(0f, Vector3.zero, 0f);
             IsMoving = false;
             bodyAction = null;

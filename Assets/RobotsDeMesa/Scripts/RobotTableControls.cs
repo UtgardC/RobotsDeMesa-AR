@@ -4,6 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Samples.ARStarterAssets;
 using UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets;
 
@@ -11,6 +13,18 @@ namespace RobotsDeMesa
 {
     public sealed class RobotTableControls : MonoBehaviour
     {
+        private static readonly Color32[] RobotColors =
+        {
+            new(126, 245, 205, 255), new(255, 193, 113, 255), new(179, 241, 111, 255)
+        };
+
+        private static readonly Color32[] ToolColors =
+        {
+            new(114, 201, 255, 255), new(255, 165, 96, 255), new(199, 166, 255, 255)
+        };
+
+        private static readonly string[] ToolNames = { "un cubo", "una pelota", "un bloque rectangular" };
+
         [SerializeField] private ARPlaneManager planes;
         [SerializeField] private ObjectSpawner spawner;
         [SerializeField] private ARInteractorSpawnTrigger placement;
@@ -29,24 +43,55 @@ namespace RobotsDeMesa
         [SerializeField] private Button cubeButton;
         [SerializeField] private Button ballButton;
         [SerializeField] private Button blockButton;
+        [SerializeField] private Button clearButton;
         [SerializeField] private TableToolbox toolbox;
+        [SerializeField] private RobotCollection collection;
+        [SerializeField] private Button[] robotTabs;
+        [SerializeField] private GameObject[] tabLocks;
+        [SerializeField] private Image[] tabHighlights;
+        [SerializeField] private TMP_Text actionsLabel;
+        [SerializeField] private Image actionsAccent;
+        [SerializeField] private Image tooltipAccent;
 
-        private RobotCompanion robot;
+        private int selectedIndex;
+        private int lockedIndex = -1;
         private int blockPlacementThroughFrame = -1;
-        private float movementHintUntil;
-        private float propHintUntil;
+        private float noticeUntil;
+        private string noticeTitle;
+        private string noticeDetail;
+        private Color tooltipDefault;
         private Rect lastSafeArea;
         private Vector2Int lastScreenSize;
+
+        private RobotCompanion SelectedRobot => collection.GetRobot(selectedIndex);
+
+        private void Awake()
+        {
+            if (tooltipAccent != null)
+                tooltipDefault = tooltipAccent.color;
+        }
 
         private void OnEnable()
         {
             spawner.objectSpawned += OnRobotPlaced;
+            collection.Unlocked += OnRobotUnlocked;
+            for (int i = 0; i < robotTabs.Length; i++)
+            {
+                var robot = collection.GetRobot(i);
+                if (robot != null)
+                    OnRobotPlaced(robot.gameObject);
+            }
+
             placement.objectSpawnTriggered.AddListener(Place);
+            robotTabs[0].onClick.AddListener(SelectMilo);
+            robotTabs[1].onClick.AddListener(SelectNova);
+            robotTabs[2].onClick.AddListener(SelectByte);
             actionsToggle.onClick.AddListener(ToggleActions);
             toolsToggle.onClick.AddListener(ToggleTools);
             cubeButton.onClick.AddListener(SelectCube);
             ballButton.onClick.AddListener(SelectBall);
             blockButton.onClick.AddListener(SelectBlock);
+            clearButton.onClick.AddListener(ClearTools);
             waveButton.onClick.AddListener(Wave);
             moveButton.onClick.AddListener(Move);
             sitButton.onClick.AddListener(ToggleSit);
@@ -57,12 +102,24 @@ namespace RobotsDeMesa
         private void OnDisable()
         {
             spawner.objectSpawned -= OnRobotPlaced;
+            collection.Unlocked -= OnRobotUnlocked;
+            for (int i = 0; i < robotTabs.Length; i++)
+            {
+                var robot = collection.GetRobot(i);
+                if (robot != null && robot.TryGetComponent<XRGrabInteractable>(out var grab))
+                    grab.selectEntered.RemoveListener(OnRobotSelected);
+            }
+
             placement.objectSpawnTriggered.RemoveListener(Place);
+            robotTabs[0].onClick.RemoveListener(SelectMilo);
+            robotTabs[1].onClick.RemoveListener(SelectNova);
+            robotTabs[2].onClick.RemoveListener(SelectByte);
             actionsToggle.onClick.RemoveListener(ToggleActions);
             toolsToggle.onClick.RemoveListener(ToggleTools);
             cubeButton.onClick.RemoveListener(SelectCube);
             ballButton.onClick.RemoveListener(SelectBall);
             blockButton.onClick.RemoveListener(SelectBlock);
+            clearButton.onClick.RemoveListener(ClearTools);
             waveButton.onClick.RemoveListener(Wave);
             moveButton.onClick.RemoveListener(Move);
             sitButton.onClick.RemoveListener(ToggleSit);
@@ -72,61 +129,64 @@ namespace RobotsDeMesa
         private void Update()
         {
             UpdateSafeArea();
-
+            var robot = SelectedRobot;
             bool hasRobot = robot != null;
             bool tracking = ARSession.state == ARSessionState.SessionTracking;
-            bool canInteract = hasRobot && tracking && !robot.IsMoving && !robot.IsManipulated;
-            placement.enabled = !actionsMenu.activeSelf && !toolsMenu.activeSelf && (!hasRobot || toolbox.HasSelection);
+            bool canInteract = hasRobot && tracking && !robot.IsManipulated;
+            bool busy = hasRobot && (robot.IsMoving || robot.IsWandering);
+
+            placement.enabled = !actionsMenu.activeSelf && !toolsMenu.activeSelf &&
+                (toolbox.HasSelection || (lockedIndex < 0 && !hasRobot));
             actionsToggle.interactable = hasRobot;
-            waveButton.interactable = canInteract;
-            moveButton.interactable = canInteract;
-            sitButton.interactable = canInteract;
+            waveButton.interactable = canInteract && !busy;
+            moveButton.interactable = canInteract && !busy;
+            sitButton.interactable = canInteract && !busy;
             removeButton.interactable = hasRobot;
 
-            string sitAction = hasRobot && robot.IsSeated ? "Levantarse" : "Sentarse";
-            if (sitLabel.text != sitAction)
-                sitLabel.text = sitAction;
+            string name = collection.GetName(selectedIndex);
+            SetText(actionsLabel, name);
+            SetText(sitLabel, hasRobot && robot.IsSeated ? "Levantarse" : "Sentarse");
+            actionsAccent.color = RobotColors[selectedIndex];
+
+            for (int i = 0; i < robotTabs.Length; i++)
+            {
+                if (tabLocks[i] != null)
+                    tabLocks[i].SetActive(!collection.IsUnlocked(i));
+                tabHighlights[i].enabled = i == (lockedIndex >= 0 ? lockedIndex : selectedIndex);
+            }
 
             if (ARSession.state == ARSessionState.Unsupported)
                 ShowStatus("RA NO DISPONIBLE", "Este dispositivo no puede iniciar la realidad aumentada.");
             else if (ARSession.state == ARSessionState.NeedsInstall || ARSession.state == ARSessionState.Installing)
                 ShowStatus("PREPARANDO ARCORE", "Completá la instalación de Servicios de Google Play para RA.");
+            else if (lockedIndex >= 0)
+                ShowStatus(collection.GetName(lockedIndex).ToUpperInvariant() + " · BLOQUEADO",
+                    "Colocá su tarjeta sobre la mesa y apuntá con la cámara para desbloquearlo.", RobotColors[lockedIndex]);
+            else if (toolbox.HasSelection)
+                ShowStatus("COLOCAR " + toolbox.SelectedLabel.ToUpperInvariant(),
+                    "Tocá una superficie para crear " + ToolNames[toolbox.SelectedIndex] + ".", ToolColors[toolbox.SelectedIndex]);
             else if (!tracking)
                 ShowStatus("BUSCANDO SEGUIMIENTO", "Apuntá a una mesa iluminada y mové el celular despacio.");
             else if (toolsMenu.activeSelf)
-                ShowStatus("CAJA DE HERRAMIENTAS", "Elegí una pieza para colocar.");
-            else if (toolbox.HasSelection)
-                ShowStatus("COLOCAR " + toolbox.SelectedLabel.ToUpperInvariant(), "Tocá el plano. Tocá la caja para cancelar.");
-            else if (Time.unscaledTime < propHintUntil)
-                ShowStatus("PIEZA COLOCADA", "Tocá y arrastrá la pieza para moverla.");
+                ShowStatus("CAJA DE HERRAMIENTAS", "Elegí una pieza o limpiá las herramientas de la mesa.");
+            else if (Time.unscaledTime < noticeUntil)
+                ShowStatus(noticeTitle, noticeDetail);
+            else if (busy)
+                ShowStatus("EN MOVIMIENTO", name + " está explorando la mesa.");
             else if (hasRobot)
-                ShowRobotStatus();
+                ShowStatus(robot.IsSeated ? "DESCANSANDO" : "LISTO PARA JUGAR",
+                    "Tocá un robot para elegirlo y abrí su menú de acciones.", RobotColors[selectedIndex]);
             else if (HasTrackedSurface())
-                ShowStatus("MESA LISTA", "Tocá la zona marcada para colocar a Milo.");
+                ShowStatus("MESA LISTA", "Tocá la zona marcada para colocar a " + name + ".", RobotColors[selectedIndex]);
             else
                 ShowStatus("BUSCANDO UNA MESA", "Mové el celular despacio sobre una superficie horizontal.");
-        }
-
-        private void ShowRobotStatus()
-        {
-            if (robot.IsMoving)
-                ShowStatus("EN MOVIMIENTO", "Milo está dando unos pasos.");
-            else if (Time.unscaledTime < movementHintUntil)
-                ShowStatus("POCO ESPACIO", "Acercá a Milo al centro de la mesa o escaneá más superficie.");
-            else if (robot.IsSeated)
-                ShowStatus("DESCANSANDO", "Puede saludar sentado o levantarse para caminar.");
-            else
-                ShowStatus("LISTO PARA JUGAR", "Elegí una acción o arrastrá a Milo. Giralo con dos dedos.");
         }
 
         private bool HasTrackedSurface()
         {
             foreach (ARPlane plane in planes.trackables)
-            {
                 if (IsTrackedTable(plane))
                     return true;
-            }
-
             return false;
         }
 
@@ -136,14 +196,70 @@ namespace RobotsDeMesa
                 plane.trackingState == TrackingState.Tracking && plane.subsumedBy == null;
         }
 
+        private void SelectMilo() => SelectRobotTab(0);
+        private void SelectNova() => SelectRobotTab(1);
+        private void SelectByte() => SelectRobotTab(2);
+
+        private void SelectRobotTab(int index)
+        {
+            bool open = collection.GetRobot(index) != null &&
+                (selectedIndex != index || !actionsMenu.activeSelf);
+            CloseMenus();
+            toolbox.Cancel();
+            noticeUntil = 0f;
+            if (collection.IsUnlocked(index))
+            {
+                lockedIndex = -1;
+                selectedIndex = index;
+                actionsMenu.SetActive(open);
+            }
+            else
+            {
+                lockedIndex = index;
+            }
+            Update();
+        }
+
+        private void OnRobotUnlocked(int index)
+        {
+            if (lockedIndex == index)
+            {
+                selectedIndex = index;
+                lockedIndex = -1;
+            }
+            ShowNotice("ROBOT DESBLOQUEADO", "Ya podés elegir a " + collection.GetName(index) + " en la colección.");
+        }
+
+        private void OnRobotPlaced(GameObject spawned)
+        {
+            if (spawned.TryGetComponent<XRGrabInteractable>(out var grab))
+                grab.selectEntered.AddListener(OnRobotSelected);
+        }
+
+        private void OnRobotSelected(SelectEnterEventArgs args)
+        {
+            var robot = args.interactableObject.transform.GetComponent<RobotCompanion>();
+            int index = collection.GetIndex(robot);
+            if (index < 0)
+                return;
+
+            CloseMenus();
+            toolbox.Cancel();
+            lockedIndex = -1;
+            selectedIndex = index;
+            noticeUntil = 0f;
+            Update();
+        }
+
         private void ToggleActions()
         {
-            if (robot == null)
+            if (SelectedRobot == null)
                 return;
 
             bool open = !actionsMenu.activeSelf;
             CloseMenus();
             toolbox.Cancel();
+            lockedIndex = -1;
             actionsMenu.SetActive(open);
             Update();
         }
@@ -153,6 +269,7 @@ namespace RobotsDeMesa
             bool open = !toolsMenu.activeSelf;
             CloseMenus();
             toolbox.Cancel();
+            lockedIndex = -1;
             toolsMenu.SetActive(open);
             Update();
         }
@@ -165,7 +282,15 @@ namespace RobotsDeMesa
         {
             CloseMenus();
             toolbox.Select(index);
-            propHintUntil = 0f;
+            noticeUntil = 0f;
+            Update();
+        }
+
+        private void ClearTools()
+        {
+            CloseMenus();
+            toolbox.Clear();
+            ShowNotice("MESA ORDENADA", "Se retiraron todas las piezas de herramientas.");
             Update();
         }
 
@@ -186,33 +311,20 @@ namespace RobotsDeMesa
             if (toolbox.HasSelection)
             {
                 if (toolbox.TryPlace(position, normal))
-                    propHintUntil = Time.unscaledTime + 2.5f;
-                Update();
+                    ShowNotice("PIEZA COLOCADA", "Arrastrala para levantarla y soltá con impulso para lanzarla.");
             }
-            else if (robot == null)
+            else if (lockedIndex < 0 && collection.TryPlace(selectedIndex, position, normal))
             {
-                spawner.TrySpawnObject(position, normal);
+                noticeUntil = 0f;
             }
-        }
-
-        private void OnRobotPlaced(GameObject spawned)
-        {
-            if (robot != null)
-            {
-                Destroy(spawned);
-                return;
-            }
-
-            robot = spawned.GetComponent<RobotCompanion>();
-            movementHintUntil = 0;
-            propHintUntil = 0;
             Update();
         }
 
         private void Wave()
         {
             CloseMenus();
-            propHintUntil = 0;
+            noticeUntil = 0f;
+            var robot = SelectedRobot;
             if (robot != null)
                 robot.Wave();
         }
@@ -220,21 +332,21 @@ namespace RobotsDeMesa
         private void Move()
         {
             CloseMenus();
-            propHintUntil = 0;
-            if (robot == null || robot.IsMoving || robot.IsManipulated ||
-                ARSession.state != ARSessionState.SessionTracking)
-                return;
-
-            movementHintUntil = 0;
-            if (!TryFindDestination(out Vector3 destination))
-                movementHintUntil = Time.unscaledTime + 3f;
-            else
-                robot.TryMove(destination);
-
+            noticeUntil = 0f;
+            var robot = SelectedRobot;
+            if (robot != null && !robot.TryWander(() => FindWanderDestination(robot)))
+                ShowNotice("POCO ESPACIO", "Acercá al robot al centro o escaneá más superficie.");
             Update();
         }
 
-        private bool TryFindDestination(out Vector3 destination)
+        private Vector3? FindWanderDestination(RobotCompanion robot)
+        {
+            if (ARSession.state != ARSessionState.SessionTracking)
+                return null;
+            return TryFindDestination(robot, out Vector3 destination) ? destination : null;
+        }
+
+        private bool TryFindDestination(RobotCompanion robot, out Vector3 destination)
         {
             destination = default;
             float closestHeight = .08f;
@@ -262,15 +374,15 @@ namespace RobotsDeMesa
             if (table == null)
                 return false;
 
-            Vector3 forward = table.transform.InverseTransformDirection(robot.transform.forward);
-            Vector2 heading = new Vector2(forward.x, forward.z).normalized;
+            float angle = Random.Range(0f, Mathf.PI * 2f);
+            Vector2 heading = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
             float planeScale = Mathf.Abs(table.transform.lossyScale.x);
-            if (heading == Vector2.zero || planeScale < .001f)
+            if (planeScale < .001f)
                 return false;
 
             Vector3 scale = robot.transform.lossyScale;
             float robotScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
-            float step = .2f * Mathf.Clamp(robotScale, .65f, 1.3f) / planeScale;
+            float step = Random.Range(.16f, .29f) * Mathf.Clamp(robotScale, .65f, 1.3f) / planeScale;
             // The collider's half diagonal allows Milo to turn without crossing the edge.
             float clearance = .103f * robotScale / planeScale;
             if (!TryStepOnPlane(table.boundary, origin, heading, step, clearance, out Vector2 target))
@@ -333,29 +445,42 @@ namespace RobotsDeMesa
         private void ToggleSit()
         {
             CloseMenus();
-            propHintUntil = 0;
+            noticeUntil = 0f;
+            var robot = SelectedRobot;
             if (robot != null)
-            {
-                movementHintUntil = 0;
                 robot.ToggleSit();
-                Update();
-            }
+            Update();
         }
 
         private void Remove()
         {
             CloseMenus();
-            propHintUntil = 0;
+            noticeUntil = 0f;
+            var robot = SelectedRobot;
             if (robot != null)
                 Destroy(robot.gameObject);
         }
 
-        private void ShowStatus(string title, string detail)
+        private void ShowNotice(string title, string detail)
         {
-            if (status.text != title)
-                status.text = title;
-            if (instructions.text != detail)
-                instructions.text = detail;
+            noticeTitle = title;
+            noticeDetail = detail;
+            noticeUntil = Time.unscaledTime + 3f;
+        }
+
+        private void ShowStatus(string title, string detail, Color? accent = null)
+        {
+            SetText(status, title);
+            SetText(instructions, detail);
+            status.color = accent ?? (Color)RobotColors[0];
+            if (tooltipAccent != null)
+                tooltipAccent.color = accent ?? tooltipDefault;
+        }
+
+        private static void SetText(TMP_Text label, string value)
+        {
+            if (label.text != value)
+                label.text = value;
         }
 
         private void UpdateSafeArea()

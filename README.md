@@ -1,6 +1,6 @@
 # Robots de Mesa AR
 
-Prototipo de realidad aumentada para Android. Milo es un robot de escritorio de 22 cm que podés colocar, mover y girar sobre una superficie real. Usá el botón de Milo abajo a la derecha para que salude, dé unos pasos sobre la mesa, se siente o se levante. **Retirar** te permite colocarlo de nuevo. La caja de herramientas de la izquierda agrega piezas a la mesa.
+Prototipo de realidad aumentada para Android. Colocá a Milo sobre una mesa real, hacelo saludar, sentarse o caminar, y desbloqueá a Nova y Byte con sus tarjetas. La app se juega en horizontal.
 
 ## Abrir el proyecto
 
@@ -12,8 +12,15 @@ Prototipo de realidad aumentada para Android. Milo es un robot de escritorio de 
 
 1. Abrí **File → Build Profiles**, activá el perfil de Android y verificá que la escena principal esté habilitada.
 2. Conectá el celular con depuración USB habilitada, elegilo en **Run Device** y usá **Build And Run**.
-3. Aceptá el permiso de cámara. Mové el celular sobre una mesa bien iluminada hasta que aparezca la superficie detectada.
-4. Tocá la superficie para colocar a Milo. Tocá su botón de la derecha para abrir **Saludar**, **Moverse**, **Sentarse** y **Retirar**. El menú se cierra al elegir la acción.
-5. Abrí la caja de la izquierda y elegí **Cubo**, **Pelota** o **Rectángulo**. Tocá la superficie marcada para colocar la pieza. Podés tocar y arrastrar tanto a Milo como a las piezas, y girarlos con dos dedos.
+3. Aceptá el permiso de cámara. Mové el celular despacio sobre una mesa iluminada y tocá el plano marcado para colocar a Milo.
+4. Elegí un robot desde la colección de arriba o tocándolo en la mesa. Su botón abajo a la derecha abre los comandos. **Moverse** lo hace caminar por varios puntos dentro de la superficie detectada.
+5. En **Herramientas**, elegí un cubo, una pelota o un rectángulo. El aviso de abajo indica qué pieza vas a crear al tocar el plano. Arrastrá una pieza para levantarla y soltá con impulso para lanzarla. **Limpiar** retira todas las piezas de herramientas.
 
-La base de cámara AR, detección de superficies y gestos proviene de la plantilla oficial AR Mobile de Unity. El modelo, la animación, la interfaz y el flujo de un robot por mesa son propios del prototipo.
+## Tarjetas de la colección
+
+Las tarjetas están en `Assets/RobotsDeMesa/Cards`. Mostrá cada imagen en otra pantalla o imprimila a **8,5 × 5,5 cm**. Ponela sobre la mesa y apuntá con la cámara. Cuando la app la reconozca, el robot aparece sobre la tarjeta y se desbloquea en la colección. Tocá su pestaña y después una zona del plano para colocarlo. Los desbloqueos quedan guardados en el dispositivo.
+
+- [Tarjeta de Nova](Assets/RobotsDeMesa/Cards/Nova.png)
+- [Tarjeta de Byte](Assets/RobotsDeMesa/Cards/Byte.png)
+
+La cámara AR, la detección de superficies y los gestos de los robots provienen de la plantilla oficial AR Mobile de Unity. Los modelos, las tarjetas, la colección y la caja de herramientas son propios del prototipo.
