@@ -22,15 +22,31 @@ namespace RobotsDeMesa
         [SerializeField] private Button sitButton;
         [SerializeField] private TMP_Text sitLabel;
         [SerializeField] private Button removeButton;
+        [SerializeField] private Button actionsToggle;
+        [SerializeField] private Button toolsToggle;
+        [SerializeField] private GameObject actionsMenu;
+        [SerializeField] private GameObject toolsMenu;
+        [SerializeField] private Button cubeButton;
+        [SerializeField] private Button ballButton;
+        [SerializeField] private Button blockButton;
+        [SerializeField] private TableToolbox toolbox;
 
         private RobotCompanion robot;
+        private int blockPlacementThroughFrame = -1;
         private float movementHintUntil;
+        private float propHintUntil;
         private Rect lastSafeArea;
         private Vector2Int lastScreenSize;
 
         private void OnEnable()
         {
             spawner.objectSpawned += OnRobotPlaced;
+            placement.objectSpawnTriggered.AddListener(Place);
+            actionsToggle.onClick.AddListener(ToggleActions);
+            toolsToggle.onClick.AddListener(ToggleTools);
+            cubeButton.onClick.AddListener(SelectCube);
+            ballButton.onClick.AddListener(SelectBall);
+            blockButton.onClick.AddListener(SelectBlock);
             waveButton.onClick.AddListener(Wave);
             moveButton.onClick.AddListener(Move);
             sitButton.onClick.AddListener(ToggleSit);
@@ -41,6 +57,12 @@ namespace RobotsDeMesa
         private void OnDisable()
         {
             spawner.objectSpawned -= OnRobotPlaced;
+            placement.objectSpawnTriggered.RemoveListener(Place);
+            actionsToggle.onClick.RemoveListener(ToggleActions);
+            toolsToggle.onClick.RemoveListener(ToggleTools);
+            cubeButton.onClick.RemoveListener(SelectCube);
+            ballButton.onClick.RemoveListener(SelectBall);
+            blockButton.onClick.RemoveListener(SelectBlock);
             waveButton.onClick.RemoveListener(Wave);
             moveButton.onClick.RemoveListener(Move);
             sitButton.onClick.RemoveListener(ToggleSit);
@@ -54,7 +76,8 @@ namespace RobotsDeMesa
             bool hasRobot = robot != null;
             bool tracking = ARSession.state == ARSessionState.SessionTracking;
             bool canInteract = hasRobot && tracking && !robot.IsMoving && !robot.IsManipulated;
-            placement.enabled = !hasRobot;
+            placement.enabled = !actionsMenu.activeSelf && !toolsMenu.activeSelf && (!hasRobot || toolbox.HasSelection);
+            actionsToggle.interactable = hasRobot;
             waveButton.interactable = canInteract;
             moveButton.interactable = canInteract;
             sitButton.interactable = canInteract;
@@ -70,6 +93,12 @@ namespace RobotsDeMesa
                 ShowStatus("PREPARANDO ARCORE", "Completá la instalación de Servicios de Google Play para RA.");
             else if (!tracking)
                 ShowStatus("BUSCANDO SEGUIMIENTO", "Apuntá a una mesa iluminada y mové el celular despacio.");
+            else if (toolsMenu.activeSelf)
+                ShowStatus("CAJA DE HERRAMIENTAS", "Elegí una pieza para colocar.");
+            else if (toolbox.HasSelection)
+                ShowStatus("COLOCAR " + toolbox.SelectedLabel.ToUpperInvariant(), "Tocá el plano. Tocá la caja para cancelar.");
+            else if (Time.unscaledTime < propHintUntil)
+                ShowStatus("PIEZA COLOCADA", "Tocá y arrastrá la pieza para moverla.");
             else if (hasRobot)
                 ShowRobotStatus();
             else if (HasTrackedSurface())
@@ -107,6 +136,65 @@ namespace RobotsDeMesa
                 plane.trackingState == TrackingState.Tracking && plane.subsumedBy == null;
         }
 
+        private void ToggleActions()
+        {
+            if (robot == null)
+                return;
+
+            bool open = !actionsMenu.activeSelf;
+            CloseMenus();
+            toolbox.Cancel();
+            actionsMenu.SetActive(open);
+            Update();
+        }
+
+        private void ToggleTools()
+        {
+            bool open = !toolsMenu.activeSelf;
+            CloseMenus();
+            toolbox.Cancel();
+            toolsMenu.SetActive(open);
+            Update();
+        }
+
+        private void SelectCube() => SelectTool(0);
+        private void SelectBall() => SelectTool(1);
+        private void SelectBlock() => SelectTool(2);
+
+        private void SelectTool(int index)
+        {
+            CloseMenus();
+            toolbox.Select(index);
+            propHintUntil = 0f;
+            Update();
+        }
+
+        private void CloseMenus()
+        {
+            actionsMenu.SetActive(false);
+            toolsMenu.SetActive(false);
+            // XRI processes placement after the UI click, even if that click hid a button.
+            blockPlacementThroughFrame = Time.frameCount + 1;
+        }
+
+        private void Place(Vector3 position, Vector3 normal)
+        {
+            if (!placement.enabled || Time.frameCount <= blockPlacementThroughFrame ||
+                ARSession.state != ARSessionState.SessionTracking)
+                return;
+
+            if (toolbox.HasSelection)
+            {
+                if (toolbox.TryPlace(position, normal))
+                    propHintUntil = Time.unscaledTime + 2.5f;
+                Update();
+            }
+            else if (robot == null)
+            {
+                spawner.TrySpawnObject(position, normal);
+            }
+        }
+
         private void OnRobotPlaced(GameObject spawned)
         {
             if (robot != null)
@@ -117,17 +205,22 @@ namespace RobotsDeMesa
 
             robot = spawned.GetComponent<RobotCompanion>();
             movementHintUntil = 0;
+            propHintUntil = 0;
             Update();
         }
 
         private void Wave()
         {
+            CloseMenus();
+            propHintUntil = 0;
             if (robot != null)
                 robot.Wave();
         }
 
         private void Move()
         {
+            CloseMenus();
+            propHintUntil = 0;
             if (robot == null || robot.IsMoving || robot.IsManipulated ||
                 ARSession.state != ARSessionState.SessionTracking)
                 return;
@@ -187,7 +280,6 @@ namespace RobotsDeMesa
             return true;
         }
 
-
         private static bool TryStepOnPlane(NativeArray<Vector2> boundary, Vector2 origin, Vector2 heading,
             float step, float clearance, out Vector2 target)
         {
@@ -240,6 +332,8 @@ namespace RobotsDeMesa
 
         private void ToggleSit()
         {
+            CloseMenus();
+            propHintUntil = 0;
             if (robot != null)
             {
                 movementHintUntil = 0;
@@ -250,6 +344,8 @@ namespace RobotsDeMesa
 
         private void Remove()
         {
+            CloseMenus();
+            propHintUntil = 0;
             if (robot != null)
                 Destroy(robot.gameObject);
         }
