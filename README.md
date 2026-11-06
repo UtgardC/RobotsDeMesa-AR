@@ -6,7 +6,7 @@ Prototipo de realidad aumentada para Android. Milo es un robot de escritorio de 
 
 - Unity `6000.4.6f1`, con Android Build Support, Android SDK & NDK Tools y OpenJDK.
 - Escena principal en `Assets/Scenes/RobotsDeMesa.unity`.
-- AR Foundation y Google ARCore XR Plugin `6.4.2`. Hace falta un Android compatible con ARCore y Servicios de Google Play para RA.
+- AR Foundation y Google ARCore XR Plugin `6.4.3`. Hace falta un Android compatible con ARCore y Servicios de Google Play para RA.
 
 ## Probar en Android
 
