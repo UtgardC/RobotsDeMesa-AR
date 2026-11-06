@@ -2,7 +2,7 @@
 
 Prototipo de realidad aumentada para Android. Colocá a Milo sobre una mesa real, hacelo saludar, sentarse o caminar, y desbloqueá a Nova y Byte con sus tarjetas.
 
-[**Video de demostración**](https://youtu.be/ajDBEc3wSNU)
+Video de demostración: [**https://youtu.be/ajDBEc3wSNU**](https://youtu.be/ajDBEc3wSNU)
 
 ## Probar en Android
 
